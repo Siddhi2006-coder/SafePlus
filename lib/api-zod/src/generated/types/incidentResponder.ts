@@ -6,12 +6,15 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface LocationUpdateBody {
+export interface IncidentResponder {
+  id: number;
   incidentId: number;
-  lat: number;
-  lng: number;
+  alias: string;
+  status: string;
+  distanceKm: number;
   /** @nullable */
-  accuracy?: number | null;
+  etaMinutes?: number | null;
+  createdAt: Date;
   /** @nullable */
-  speed?: number | null;
+  respondedAt?: Date | null;
 }

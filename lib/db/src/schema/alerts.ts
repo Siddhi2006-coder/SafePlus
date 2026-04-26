@@ -9,9 +9,13 @@ import {
 export const alertsTable = pgTable("alerts", {
   id: serial("id").primaryKey(),
   incidentId: integer("incident_id").notNull(),
-  channel: text("channel").notNull(), // sms | call | whatsapp | push
-  target: text("target").notNull(), // phone or user id
-  status: text("status").notNull().default("sent"),
+  channel: text("channel").notNull(),
+  target: text("target").notNull(),
+  status: text("status").notNull().default("sending"),
+  attempts: integer("attempts").notNull().default(1),
+  priority: text("priority").notNull().default("circle"),
+  lastError: text("last_error"),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

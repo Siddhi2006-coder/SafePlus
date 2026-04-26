@@ -22,4 +22,16 @@ export const storage = {
       /* ignore */
     }
   },
+  async getJSON<T>(key: string): Promise<T | null> {
+    const raw = await this.get(key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  },
+  async setJSON(key: string, value: unknown): Promise<void> {
+    await this.set(key, JSON.stringify(value));
+  },
 };

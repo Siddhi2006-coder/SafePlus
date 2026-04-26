@@ -73,6 +73,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="helpers"
+        options={{
+          title: "Helpers",
+          tabBarIcon: renderIcon("heart"),
+        }}
+      />
+      <Tabs.Screen
         name="history"
         options={{
           title: "History",

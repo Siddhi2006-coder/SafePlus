@@ -5,9 +5,8 @@
  * SafeSphere API specification
  * OpenAPI spec version: 0.2.0
  */
-import type { User } from "./user";
 
-export interface AuthSession {
-  token: string;
-  user: User;
+export interface AvailabilityBody {
+  /** available | unavailable */
+  status: string;
 }

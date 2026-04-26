@@ -6,3 +6,4 @@ export * from "./incidents";
 export * from "./locations";
 export * from "./media";
 export * from "./alerts";
+export * from "./responders";

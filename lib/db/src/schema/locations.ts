@@ -3,6 +3,8 @@ import {
   serial,
   integer,
   doublePrecision,
+  text,
+  boolean,
   timestamp,
 } from "drizzle-orm/pg-core";
 
@@ -13,6 +15,8 @@ export const locationsTable = pgTable("locations", {
   lng: doublePrecision("lng").notNull(),
   accuracy: doublePrecision("accuracy"),
   speed: doublePrecision("speed"),
+  encrypted: boolean("encrypted").notNull().default(true),
+  digest: text("digest"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

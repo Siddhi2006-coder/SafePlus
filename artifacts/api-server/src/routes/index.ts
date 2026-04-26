@@ -6,6 +6,7 @@ import sosRouter from "./sos";
 import locationRouter from "./location";
 import mediaRouter from "./media";
 import incidentsRouter from "./incidents";
+import respondersRouter from "./responders";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(sosRouter);
 router.use(locationRouter);
 router.use(mediaRouter);
 router.use(incidentsRouter);
+router.use(respondersRouter);
 
 export default router;

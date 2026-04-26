@@ -6,12 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface LocationUpdateBody {
+export interface RiskUpdate {
   incidentId: number;
-  lat: number;
-  lng: number;
-  /** @nullable */
-  accuracy?: number | null;
-  /** @nullable */
-  speed?: number | null;
+  riskScore: number;
+  riskLevel: string;
+  escalationSeconds: number;
 }

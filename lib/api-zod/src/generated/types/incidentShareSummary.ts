@@ -6,12 +6,8 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface LocationUpdateBody {
+export interface IncidentShareSummary {
   incidentId: number;
-  lat: number;
-  lng: number;
-  /** @nullable */
-  accuracy?: number | null;
-  /** @nullable */
-  speed?: number | null;
+  summary: string;
+  mapsUrl: string;
 }

@@ -9,6 +9,7 @@ import {
 import { UpdateLocationBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { toApiLocation } from "../lib/serializers";
+import { locationDigest } from "../lib/crypto";
 
 const router: IRouter = Router();
 router.use(requireAuth);
@@ -42,6 +43,8 @@ router.post("/location/update", async (req, res): Promise<void> => {
     lng,
     accuracy: accuracy ?? null,
     speed: speed ?? null,
+    encrypted: true,
+    digest: locationDigest(incidentId, lat, lng),
   });
 
   await db

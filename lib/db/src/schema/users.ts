@@ -18,6 +18,8 @@ export const usersTable = pgTable(
     lastLat: doublePrecision("last_lat"),
     lastLng: doublePrecision("last_lng"),
     lastLocationAt: timestamp("last_location_at", { withTimezone: true }),
+    responderStatus: text("responder_status").notNull().default("available"),
+    helperAlias: text("helper_alias"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

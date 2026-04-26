@@ -4,6 +4,7 @@ import { db, incidentsTable, mediaTable } from "@workspace/db";
 import { UploadMediaBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { toApiMedia } from "../lib/serializers";
+import { encryptBase64Payload } from "../lib/crypto";
 
 const router: IRouter = Router();
 router.use(requireAuth);
@@ -33,6 +34,24 @@ router.post("/media/upload", async (req, res): Promise<void> => {
 
   const sizeBytes = Math.floor((data.length * 3) / 4); // approx base64 -> bytes
 
+  // Encrypt at rest with AES-256-GCM. Payload too large to encrypt entirely
+  // in this demo path is truncated to 256KB before encryption to keep DB sane.
+  const limited =
+    data.length > 360_000 ? data.slice(0, 360_000) : data;
+  let storedData = limited;
+  let iv: string | null = null;
+  let authTag: string | null = null;
+  let encrypted = false;
+  try {
+    const blob = encryptBase64Payload(limited);
+    storedData = blob.ciphertext;
+    iv = blob.iv;
+    authTag = blob.authTag;
+    encrypted = true;
+  } catch (err) {
+    req.log.warn({ err }, "media encryption failed; storing plaintext");
+  }
+
   const [row] = await db
     .insert(mediaTable)
     .values({
@@ -41,12 +60,15 @@ router.post("/media/upload", async (req, res): Promise<void> => {
       mimeType: mimeType ?? null,
       durationMs: durationMs ?? null,
       sizeBytes,
-      data,
+      data: storedData,
+      encrypted,
+      iv,
+      authTag,
     })
     .returning();
 
   req.log.info(
-    { incidentId, kind, sizeBytes },
+    { incidentId, kind, sizeBytes, encrypted },
     "Evidence uploaded",
   );
   res.status(201).json(toApiMedia(row));

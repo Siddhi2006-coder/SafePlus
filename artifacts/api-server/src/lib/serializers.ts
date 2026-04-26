@@ -5,6 +5,7 @@ import type {
   LocationRow,
   MediaRow,
   Alert as DbAlert,
+  Responder as DbResponder,
 } from "@workspace/db";
 
 export function toApiUser(u: DbUser) {
@@ -13,6 +14,8 @@ export function toApiUser(u: DbUser) {
     name: u.name,
     email: u.email,
     phone: u.phone,
+    responderStatus: u.responderStatus ?? "available",
+    helperAlias: u.helperAlias ?? null,
     createdAt: u.createdAt.toISOString(),
   };
 }
@@ -37,6 +40,10 @@ export function toApiIncident(i: DbIncident) {
     alertsSent: i.alertsSent,
     escalated: i.escalated,
     discreet: i.discreet,
+    riskScore: i.riskScore ?? 15,
+    riskLevel: i.riskLevel ?? "medium",
+    motionMaxSpeed: i.motionMaxSpeed ?? null,
+    triggerCount24h: i.triggerCount24h ?? 1,
     message: i.message ?? null,
     resolvedAt: i.resolvedAt ? i.resolvedAt.toISOString() : null,
     createdAt: i.createdAt.toISOString(),
@@ -51,6 +58,7 @@ export function toApiLocation(l: LocationRow) {
     lng: l.lng,
     accuracy: l.accuracy ?? null,
     speed: l.speed ?? null,
+    encrypted: l.encrypted ?? true,
     createdAt: l.createdAt.toISOString(),
   };
 }
@@ -64,6 +72,7 @@ export function toApiMedia(m: MediaRow) {
     durationMs: m.durationMs ?? null,
     mimeType: m.mimeType ?? null,
     url: null,
+    encrypted: m.encrypted ?? true,
     createdAt: m.createdAt.toISOString(),
   };
 }
@@ -75,6 +84,23 @@ export function toApiAlert(a: DbAlert) {
     channel: a.channel,
     target: a.target,
     status: a.status,
+    attempts: a.attempts ?? 1,
+    priority: a.priority ?? "circle",
+    lastError: a.lastError ?? null,
+    deliveredAt: a.deliveredAt ? a.deliveredAt.toISOString() : null,
     createdAt: a.createdAt.toISOString(),
+  };
+}
+
+export function toApiResponder(r: DbResponder) {
+  return {
+    id: r.id,
+    incidentId: r.incidentId,
+    alias: r.alias,
+    status: r.status,
+    distanceKm: r.distanceKm,
+    etaMinutes: r.etaMinutes ?? null,
+    createdAt: r.createdAt.toISOString(),
+    respondedAt: r.respondedAt ? r.respondedAt.toISOString() : null,
   };
 }

@@ -1,5 +1,6 @@
 /**
- * SafePulse design tokens — calming lavender → soft blue palette.
+ * SafeSphere design tokens — calming lavender → soft blue palette.
+ * Risk colors graduate from blue (low) → lavender (medium) → amber (high) → red (critical).
  */
 
 const colors = {
@@ -40,6 +41,11 @@ const colors = {
     bgGradientStart: "#eee6ff",
     bgGradientMid: "#dde6ff",
     bgGradientEnd: "#f7f5ff",
+
+    riskLow: "#3fc594",
+    riskMedium: "#7c6cff",
+    riskHigh: "#ffb547",
+    riskCritical: "#ff4d6d",
   },
 
   dark: {
@@ -79,6 +85,11 @@ const colors = {
     bgGradientStart: "#160f3d",
     bgGradientMid: "#0f1340",
     bgGradientEnd: "#0d0a23",
+
+    riskLow: "#4fd9a8",
+    riskMedium: "#a99dff",
+    riskHigh: "#ffc266",
+    riskCritical: "#ff5f7d",
   },
 
   radius: 20,

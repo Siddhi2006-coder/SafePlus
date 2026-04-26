@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: SafePulse API specification
+  version: 0.2.0
+  description: SafeSphere API specification
 servers:
   - url: /api
     description: Base API path
@@ -15,6 +15,7 @@ tags:
   - name: location
   - name: media
   - name: incidents
+  - name: responders
 paths:
   /healthz:
     get:
@@ -219,7 +220,7 @@ paths:
     post:
       operationId: escalateNearby
       tags: [sos]
-      summary: Escalate to nearby SafePulse users when no response
+      summary: Escalate to nearby SafeSphere users when no response
       parameters:
         - name: id
           in: path
@@ -234,6 +235,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/EscalationResult"
 
+  /sos/{id}/motion:
+    post:
+      operationId: reportMotion
+      tags: [sos]
+      summary: Report device motion sample for AI risk scoring
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MotionSampleBody"
+      responses:
+        "200":
+          description: Updated risk
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskUpdate"
+
+  /sos/{id}/responders:
+    get:
+      operationId: getIncidentResponders
+      tags: [responders]
+      summary: List responders engaged on this incident
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Responders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IncidentResponder"
+
   /sos/active:
     get:
       operationId: getActiveIncident
@@ -246,6 +293,97 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ActiveIncidentResponse"
+
+  /responders/availability:
+    post:
+      operationId: setResponderAvailability
+      tags: [responders]
+      summary: Toggle whether you are available to help nearby users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AvailabilityBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityState"
+
+  /responders/availability/me:
+    get:
+      operationId: getMyAvailability
+      tags: [responders]
+      summary: Get current responder availability state
+      responses:
+        "200":
+          description: Current state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityState"
+
+  /responders/invitations:
+    get:
+      operationId: listMyInvitations
+      tags: [responders]
+      summary: List active SOS invitations sent to me as a nearby helper
+      responses:
+        "200":
+          description: Invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HelperInvitation"
+
+  /responders/invitations/{id}/accept:
+    post:
+      operationId: acceptInvitation
+      tags: [responders]
+      summary: Accept an SOS invitation as a helper
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInvitationBody"
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelperInvitation"
+
+  /responders/invitations/{id}/decline:
+    post:
+      operationId: declineInvitation
+      tags: [responders]
+      summary: Decline an SOS invitation as a helper
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Declined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelperInvitation"
 
   /location/update:
     post:
@@ -291,7 +429,7 @@ paths:
     post:
       operationId: uploadMedia
       tags: [media]
-      summary: Upload audio/video evidence (base64 inline)
+      summary: Upload audio/video evidence (encrypted at rest)
       requestBody:
         required: true
         content:
@@ -325,7 +463,7 @@ paths:
     get:
       operationId: getIncidentDetail
       tags: [incidents]
-      summary: Detailed incident with alerts, locations, media
+      summary: Detailed incident with alerts, locations, media, responders
       parameters:
         - name: id
           in: path
@@ -339,6 +477,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IncidentDetail"
+
+  /incidents/{id}/share:
+    get:
+      operationId: getIncidentShareSummary
+      tags: [incidents]
+      summary: Generate a shareable plain-text evidence summary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Share payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentShareSummary"
 
   /incidents/stats:
     get:
@@ -409,12 +566,15 @@ components:
 
     User:
       type: object
-      required: [id, name, email, phone, createdAt]
+      required: [id, name, email, phone, createdAt, responderStatus]
       properties:
         id: { type: integer }
         name: { type: string }
         email: { type: string }
         phone: { type: string }
+        responderStatus: { type: string }
+        helperAlias:
+          type: ["string", "null"]
         createdAt: { type: string, format: date-time }
 
     Contact:
@@ -451,6 +611,29 @@ components:
         message:
           type: ["string", "null"]
 
+    MotionSampleBody:
+      type: object
+      required: [speed]
+      properties:
+        speed:
+          type: number
+          description: m/s
+        accel:
+          type: ["number", "null"]
+          description: m/s² peak
+        repeated:
+          type: ["boolean", "null"]
+          description: User pressed SOS multiple times
+
+    RiskUpdate:
+      type: object
+      required: [incidentId, riskScore, riskLevel, escalationSeconds]
+      properties:
+        incidentId: { type: integer }
+        riskScore: { type: integer }
+        riskLevel: { type: string }
+        escalationSeconds: { type: integer }
+
     Incident:
       type: object
       required:
@@ -463,6 +646,8 @@ components:
           alertsSent,
           escalated,
           discreet,
+          riskScore,
+          riskLevel,
           createdAt,
         ]
       properties:
@@ -474,6 +659,12 @@ components:
         alertsSent: { type: integer }
         escalated: { type: boolean }
         discreet: { type: boolean }
+        riskScore: { type: integer }
+        riskLevel: { type: string }
+        motionMaxSpeed:
+          type: ["number", "null"]
+        triggerCount24h:
+          type: ["integer", "null"]
         message:
           type: ["string", "null"]
         resolvedAt:
@@ -512,7 +703,7 @@ components:
 
     LocationPoint:
       type: object
-      required: [id, incidentId, lat, lng, createdAt]
+      required: [id, incidentId, lat, lng, encrypted, createdAt]
       properties:
         id: { type: integer }
         incidentId: { type: integer }
@@ -522,6 +713,7 @@ components:
           type: ["number", "null"]
         speed:
           type: ["number", "null"]
+        encrypted: { type: boolean }
         createdAt: { type: string, format: date-time }
 
     UploadMediaBody:
@@ -534,7 +726,7 @@ components:
           description: audio | video | photo
         data:
           type: string
-          description: Base64-encoded media payload
+          description: Base64-encoded media payload (encrypted at rest)
         mimeType:
           type: ["string", "null"]
         durationMs:
@@ -542,7 +734,7 @@ components:
 
     MediaItem:
       type: object
-      required: [id, incidentId, kind, sizeBytes, createdAt]
+      required: [id, incidentId, kind, sizeBytes, encrypted, createdAt]
       properties:
         id: { type: integer }
         incidentId: { type: integer }
@@ -554,22 +746,48 @@ components:
           type: ["integer", "null"]
         mimeType:
           type: ["string", "null"]
+        encrypted: { type: boolean }
         createdAt: { type: string, format: date-time }
 
     AlertItem:
       type: object
-      required: [id, incidentId, channel, target, status, createdAt]
+      required:
+        [id, incidentId, channel, target, status, attempts, priority, createdAt]
       properties:
         id: { type: integer }
         incidentId: { type: integer }
         channel: { type: string }
         target: { type: string }
         status: { type: string }
+        attempts: { type: integer }
+        priority: { type: string }
+        lastError:
+          type: ["string", "null"]
+        deliveredAt:
+          type: ["string", "null"]
+          format: date-time
         createdAt: { type: string, format: date-time }
+
+    IncidentResponder:
+      type: object
+      required:
+        [id, incidentId, alias, status, distanceKm, createdAt]
+      properties:
+        id: { type: integer }
+        incidentId: { type: integer }
+        alias: { type: string }
+        status: { type: string }
+        distanceKm: { type: number }
+        etaMinutes:
+          type: ["integer", "null"]
+        createdAt: { type: string, format: date-time }
+        respondedAt:
+          type: ["string", "null"]
+          format: date-time
 
     IncidentDetail:
       type: object
-      required: [incident, alerts, locations, media]
+      required: [incident, alerts, locations, media, responders]
       properties:
         incident:
           $ref: "#/components/schemas/Incident"
@@ -585,6 +803,71 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MediaItem"
+        responders:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncidentResponder"
+
+    IncidentShareSummary:
+      type: object
+      required: [incidentId, summary, mapsUrl]
+      properties:
+        incidentId: { type: integer }
+        summary: { type: string }
+        mapsUrl: { type: string }
+
+    AvailabilityBody:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          description: available | unavailable
+
+    AvailabilityState:
+      type: object
+      required: [status, alias]
+      properties:
+        status: { type: string }
+        alias: { type: string }
+
+    HelperInvitation:
+      type: object
+      required:
+        [
+          id,
+          incidentId,
+          alias,
+          status,
+          distanceKm,
+          createdAt,
+          victimAlias,
+          incidentLat,
+          incidentLng,
+          riskLevel,
+        ]
+      properties:
+        id: { type: integer }
+        incidentId: { type: integer }
+        alias: { type: string }
+        status: { type: string }
+        distanceKm: { type: number }
+        etaMinutes:
+          type: ["integer", "null"]
+        createdAt: { type: string, format: date-time }
+        respondedAt:
+          type: ["string", "null"]
+          format: date-time
+        victimAlias: { type: string }
+        incidentLat: { type: number }
+        incidentLng: { type: number }
+        riskLevel: { type: string }
+
+    AcceptInvitationBody:
+      type: object
+      properties:
+        etaMinutes:
+          type: ["integer", "null"]
 
     IncidentStats:
       type: object

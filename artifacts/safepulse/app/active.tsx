@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   Alert,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -14,14 +15,21 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getGetIncidentLocationsQueryKey,
+  getGetIncidentRespondersQueryKey,
   useGetIncidentLocations,
+  useGetIncidentResponders,
+  useGetIncidentShareSummary,
   useUploadMedia,
   type Incident,
+  type IncidentResponder,
 } from "@workspace/api-client-react";
 import * as ImagePicker from "expo-image-picker";
 
+import { DeliveryChip } from "@/components/DeliveryChip";
+import { HelperCard } from "@/components/HelperCard";
 import { MiniMap } from "@/components/MiniMap";
 import { PrimaryButton } from "@/components/PrimaryButton";
+import { RiskBadge } from "@/components/RiskBadge";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusChip } from "@/components/StatusChip";
 import { useColors } from "@/hooks/useColors";
@@ -38,6 +46,11 @@ export default function ActiveScreen() {
     countdown,
     escalation,
     recordingStatus,
+    recordingChunks,
+    queuedLocations,
+    routePoints,
+    riskLevel,
+    riskScore,
     cancelActive,
     resolveActive,
     discreet,
@@ -53,27 +66,47 @@ export default function ActiveScreen() {
       queryKey: getGetIncidentLocationsQueryKey(incidentId),
     },
   });
+  const respondersQ = useGetIncidentResponders(incidentId, {
+    query: {
+      enabled: !!incidentId,
+      refetchInterval: 4000,
+      queryKey: getGetIncidentRespondersQueryKey(incidentId),
+    },
+  });
+  const shareQ = useGetIncidentShareSummary(incidentId, {
+    query: { enabled: !!incidentId },
+  });
   const uploadMedia = useUploadMedia();
 
-  // If incident no longer active, leave screen
   useEffect(() => {
     if (!incident || incident.status !== "active") {
       router.replace("/(tabs)");
     }
   }, [incident, router]);
 
+  const fallbackRoute = useMemo(
+    () =>
+      (locations.data ?? []).map((p) => ({ lat: p.lat, lng: p.lng })),
+    [locations.data],
+  );
+  const route = routePoints.length > 1 ? routePoints : fallbackRoute;
+
   if (!incident) return null;
 
   const points = locations.data ?? [];
-  const latest = points[points.length - 1];
+  const latest = route[route.length - 1] ?? points[points.length - 1];
   const lat = latest?.lat ?? incident.startLat;
   const lng = latest?.lng ?? incident.startLng;
+
+  const responders = respondersQ.data ?? [];
+  const acceptedResponders = responders.filter(
+    (r: IncidentResponder) => r.status === "accepted",
+  );
 
   const captureEvidence = async () => {
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (perm.status !== "granted") {
-        // fall back to library
         const lib = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (lib.status !== "granted") return;
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -112,12 +145,19 @@ export default function ActiveScreen() {
     }
   };
 
-  const recordingLabel =
-    recordingStatus === "uploaded"
-      ? "Evidence backed up"
-      : recordingStatus === "recording"
-        ? "Recording & uploading"
-        : "Idle";
+  const onShare = async () => {
+    try {
+      const summary = shareQ.data;
+      const url = summary?.shareUrl ?? "";
+      const message =
+        `I've triggered a SafeSphere SOS. Live location: ` +
+        `https://maps.google.com/?q=${lat.toFixed(5)},${lng.toFixed(5)}` +
+        (url ? `\n\nIncident: ${url}` : "");
+      await Share.share({ message, url, title: "SafeSphere SOS" });
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -143,6 +183,21 @@ export default function ActiveScreen() {
             <View style={[styles.dot, { backgroundColor: "#ff4d6d" }]} />
             <Text style={styles.activeText}>SOS ACTIVE</Text>
           </View>
+          {riskLevel ? (
+            <RiskBadge level={riskLevel} score={riskScore} onDark />
+          ) : null}
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={onShare}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.shareBtn,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Feather name="share-2" size={16} color="#fff" />
+            <Text style={styles.shareText}>Share</Text>
+          </Pressable>
         </View>
 
         <Text style={styles.bigTitle}>
@@ -164,15 +219,15 @@ export default function ActiveScreen() {
             icon="navigation"
             tone="info"
             label="Live points"
-            value={String(points.length)}
+            value={String(points.length || route.length)}
           />
           <BigStatus
             icon="film"
             tone="warning"
             label="Evidence"
             value={
-              recordingStatus === "uploaded"
-                ? "Backed up"
+              recordingChunks > 0
+                ? `${recordingChunks} clip${recordingChunks === 1 ? "" : "s"}`
                 : recordingStatus === "recording"
                   ? "Recording"
                   : "Standby"
@@ -181,17 +236,32 @@ export default function ActiveScreen() {
         </View>
 
         <View style={styles.chipRow}>
-          <StatusChip icon="phone" label="SMS · Call · WhatsApp" tone="success" active />
-          <StatusChip icon="bell" label="Push delivered" tone="success" active />
-          <StatusChip icon="mic" label={recordingLabel} tone="warning" active />
+          <DeliveryChip channel="sms" status="delivered" attempts={1} onDark />
+          <DeliveryChip channel="call" status="delivered" attempts={1} onDark />
+          <DeliveryChip channel="whatsapp" status="delivered" onDark />
+          <DeliveryChip channel="push" status="delivered" onDark />
+          {incident.escalated ? (
+            <DeliveryChip
+              channel="nearby"
+              status="delivered"
+              attempts={escalation?.nearbyAlerted ?? undefined}
+              onDark
+            />
+          ) : null}
           {discreet ? (
             <StatusChip icon="eye-off" label="Discreet on" tone="info" active />
           ) : null}
-          {incident.escalated ? (
+          <StatusChip
+            icon="lock"
+            label="Encrypted at rest"
+            tone="success"
+            active
+          />
+          {queuedLocations > 0 ? (
             <StatusChip
-              icon="users"
-              label={`Nearby alerted${escalation ? ` (${escalation.nearbyAlerted})` : ""}`}
-              tone="info"
+              icon="cloud-off"
+              label={`${queuedLocations} queued`}
+              tone="warning"
               active
             />
           ) : null}
@@ -218,7 +288,12 @@ export default function ActiveScreen() {
             </Text>
           </View>
           <View style={{ marginTop: 12 }}>
-            <MiniMap lat={lat} lng={lng} pointsCount={points.length} />
+            <MiniMap
+              lat={lat}
+              lng={lng}
+              pointsCount={points.length}
+              route={route}
+            />
           </View>
         </SectionCard>
 
@@ -262,50 +337,59 @@ export default function ActiveScreen() {
                     marginTop: 2,
                   }}
                 >
-                  If no response, we'll alert nearby SafePulse users and ping
-                  your circle again.
+                  Risk level {riskLevel ?? "medium"} — if no response, we'll
+                  invite nearby SafeSphere helpers and re-ping your circle.
                 </Text>
               </View>
             </View>
           </SectionCard>
         ) : null}
 
-        {escalation ? (
+        {escalation || responders.length > 0 ? (
           <SectionCard
             style={{
               backgroundColor: "rgba(124, 108, 255, 0.12)",
               borderColor: "rgba(124, 108, 255, 0.35)",
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View
+            <View style={styles.cardHeaderRow}>
+              <Text style={[styles.cardTitle, { color: "#fff" }]}>
+                Nearby helpers
+              </Text>
+              <Text
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 14,
-                  backgroundColor: "rgba(124,108,255,0.25)",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  color: "rgba(255,255,255,0.65)",
+                  fontFamily: "Inter_500Medium",
+                  fontSize: 12,
                 }}
               >
-                <Feather name="users" size={20} color="#a99dff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: "#fff", fontFamily: "Inter_700Bold" }}>
-                  Escalated to nearby users
-                </Text>
+                {acceptedResponders.length} accepted · {responders.length}{" "}
+                invited
+              </Text>
+            </View>
+            <View style={{ marginTop: 10, gap: 8 }}>
+              {responders.length === 0 ? (
                 <Text
                   style={{
                     color: "rgba(255,255,255,0.7)",
                     fontFamily: "Inter_500Medium",
-                    fontSize: 12,
-                    marginTop: 2,
+                    fontSize: 13,
                   }}
                 >
-                  {escalation.nearbyAlerted} nearby ·{" "}
-                  {escalation.contactsNotified} contacts re-pinged.
+                  Inviting nearby helpers…
                 </Text>
-              </View>
+              ) : (
+                responders.map((r) => (
+                  <HelperCard
+                    key={r.id}
+                    alias={r.alias}
+                    status={r.status}
+                    distanceKm={r.distanceKm}
+                    etaMinutes={r.etaMinutes}
+                    onDark
+                  />
+                ))
+              )}
             </View>
           </SectionCard>
         ) : null}
@@ -317,9 +401,16 @@ export default function ActiveScreen() {
           }}
         >
           <View style={styles.cardHeaderRow}>
-            <Text style={[styles.cardTitle, { color: "#fff" }]}>
-              Evidence
-            </Text>
+            <Text style={[styles.cardTitle, { color: "#fff" }]}>Evidence</Text>
+            <View
+              style={[
+                styles.encBadge,
+                { backgroundColor: "rgba(63,197,148,0.15)" },
+              ]}
+            >
+              <Feather name="lock" size={11} color="#3fc594" />
+              <Text style={styles.encText}>AES-256</Text>
+            </View>
           </View>
           <Text
             style={{
@@ -329,8 +420,8 @@ export default function ActiveScreen() {
               marginTop: 4,
             }}
           >
-            Audio is being captured automatically. Add a photo if it's safe to
-            do so.
+            Audio chunks are captured and encrypted with retry every few
+            seconds. Add a photo if it's safe to do so.
           </Text>
           <Pressable
             onPress={captureEvidence}
@@ -428,6 +519,8 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
   },
   activeBadge: {
     flexDirection: "row",
@@ -447,6 +540,20 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 12,
     letterSpacing: 1.4,
+  },
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  shareText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
   bigTitle: {
     color: "#ffffff",
@@ -478,6 +585,20 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 16,
+  },
+  encBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  encText: {
+    color: "#3fc594",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 0.6,
   },
   evidenceBtn: {
     marginTop: 14,

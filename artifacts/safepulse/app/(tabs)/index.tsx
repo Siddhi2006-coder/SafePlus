@@ -33,6 +33,8 @@ export default function HomeScreen() {
     voiceEnabled,
     voiceSupported,
     discreet,
+    riskLevel,
+    countdown,
     trigger,
     setVoiceEnabled,
     setDiscreet,
@@ -118,6 +120,8 @@ export default function HomeScreen() {
           <PulseSosButton
             active={!!activeIncident}
             loading={triggering}
+            riskLevel={riskLevel}
+            countdown={countdown}
             onPress={() => trigger("button")}
           />
           <Text style={[styles.sosHint, { color: c.mutedForeground }]}>
@@ -139,7 +143,7 @@ export default function HomeScreen() {
               hint={
                 voiceSupported
                   ? voiceEnabled
-                    ? "Listening for ‘Hey SafePulse’"
+                    ? "Listening for ‘Hey SafeSphere’"
                     : "Hands-free SOS by voice"
                   : "Best on a supported browser"
               }

@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "vtmaX_XNy0Fv4UcihCFjj"
+uri = "file://artifacts/safepulse/assets/images/icon.png"
+type = "image"
+title = "generated_image"

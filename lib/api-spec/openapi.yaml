@@ -3,20 +3,24 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SafePulse API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
+  - name: contacts
+  - name: sos
+  - name: location
+  - name: media
+  - name: incidents
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +28,588 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a new account and send OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupBody"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpChallenge"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email + password, returns OTP challenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpChallenge"
+
+  /auth/verify-otp:
+    post:
+      operationId: verifyOtp
+      tags: [auth]
+      summary: Verify OTP and start session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOtpBody"
+      responses:
+        "200":
+          description: Session established
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: End session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleOk"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: List trusted contacts
+      responses:
+        "200":
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: Add trusted contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}:
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /sos/trigger:
+    post:
+      operationId: triggerSos
+      tags: [sos]
+      summary: Trigger SOS — creates an incident, sends alerts to contacts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerSosBody"
+      responses:
+        "201":
+          description: Incident created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /sos/{id}/cancel:
+    post:
+      operationId: cancelIncident
+      tags: [sos]
+      summary: Cancel an active incident (false alarm)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Incident cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /sos/{id}/resolve:
+    post:
+      operationId: resolveIncident
+      tags: [sos]
+      summary: Mark incident as resolved (safe)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+
+  /sos/{id}/escalate-nearby:
+    post:
+      operationId: escalateNearby
+      tags: [sos]
+      summary: Escalate to nearby SafePulse users when no response
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Escalation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscalationResult"
+
+  /sos/active:
+    get:
+      operationId: getActiveIncident
+      tags: [sos]
+      summary: Get currently active incident if any
+      responses:
+        "200":
+          description: Active incident or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveIncidentResponse"
+
+  /location/update:
+    post:
+      operationId: updateLocation
+      tags: [location]
+      summary: Push a live location point for an active incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationUpdateBody"
+      responses:
+        "200":
+          description: Stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleOk"
+
+  /location/incident/{id}:
+    get:
+      operationId: getIncidentLocations
+      tags: [location]
+      summary: Get all location points for an incident
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Location points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LocationPoint"
+
+  /media/upload:
+    post:
+      operationId: uploadMedia
+      tags: [media]
+      summary: Upload audio/video evidence (base64 inline)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadMediaBody"
+      responses:
+        "201":
+          description: Media stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaItem"
+
+  /incidents/history:
+    get:
+      operationId: getIncidentHistory
+      tags: [incidents]
+      summary: List user's past incidents (newest first)
+      responses:
+        "200":
+          description: History
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+
+  /incidents/{id}:
+    get:
+      operationId: getIncidentDetail
+      tags: [incidents]
+      summary: Detailed incident with alerts, locations, media
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentDetail"
+
+  /incidents/stats:
+    get:
+      operationId: getIncidentStats
+      tags: [incidents]
+      summary: Aggregate stats for the dashboard
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentStats"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
-        status:
-          type: string
-      required:
-        - status
+        status: { type: string }
 
+    SimpleOk:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    SignupBody:
+      type: object
+      required: [name, email, phone, password]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        password: { type: string }
+
+    LoginBody:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    OtpChallenge:
+      type: object
+      required: [challengeId, devOtp]
+      properties:
+        challengeId: { type: string }
+        devOtp:
+          type: ["string", "null"]
+          description: Returned in dev mode so users can complete the flow without SMS gateway
+
+    VerifyOtpBody:
+      type: object
+      required: [challengeId, code]
+      properties:
+        challengeId: { type: string }
+        code: { type: string }
+
+    AuthSession:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required: [id, name, email, phone, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    Contact:
+      type: object
+      required: [id, name, phone, relation, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        phone: { type: string }
+        relation: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    CreateContactBody:
+      type: object
+      required: [name, phone, relation]
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        relation: { type: string }
+
+    TriggerSosBody:
+      type: object
+      required: [trigger, lat, lng]
+      properties:
+        trigger:
+          type: string
+          description: button | voice | lock-screen | shake
+        lat: { type: number }
+        lng: { type: number }
+        accuracy:
+          type: ["number", "null"]
+        discreet:
+          type: ["boolean", "null"]
+        message:
+          type: ["string", "null"]
+
+    Incident:
+      type: object
+      required:
+        [
+          id,
+          status,
+          trigger,
+          startLat,
+          startLng,
+          alertsSent,
+          escalated,
+          discreet,
+          createdAt,
+        ]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        trigger: { type: string }
+        startLat: { type: number }
+        startLng: { type: number }
+        alertsSent: { type: integer }
+        escalated: { type: boolean }
+        discreet: { type: boolean }
+        message:
+          type: ["string", "null"]
+        resolvedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt: { type: string, format: date-time }
+
+    ActiveIncidentResponse:
+      type: object
+      required: [incident]
+      properties:
+        incident:
+          oneOf:
+            - $ref: "#/components/schemas/Incident"
+            - type: "null"
+
+    EscalationResult:
+      type: object
+      required: [incidentId, nearbyAlerted, contactsNotified]
+      properties:
+        incidentId: { type: integer }
+        nearbyAlerted: { type: integer }
+        contactsNotified: { type: integer }
+
+    LocationUpdateBody:
+      type: object
+      required: [incidentId, lat, lng]
+      properties:
+        incidentId: { type: integer }
+        lat: { type: number }
+        lng: { type: number }
+        accuracy:
+          type: ["number", "null"]
+        speed:
+          type: ["number", "null"]
+
+    LocationPoint:
+      type: object
+      required: [id, incidentId, lat, lng, createdAt]
+      properties:
+        id: { type: integer }
+        incidentId: { type: integer }
+        lat: { type: number }
+        lng: { type: number }
+        accuracy:
+          type: ["number", "null"]
+        speed:
+          type: ["number", "null"]
+        createdAt: { type: string, format: date-time }
+
+    UploadMediaBody:
+      type: object
+      required: [incidentId, kind, data]
+      properties:
+        incidentId: { type: integer }
+        kind:
+          type: string
+          description: audio | video | photo
+        data:
+          type: string
+          description: Base64-encoded media payload
+        mimeType:
+          type: ["string", "null"]
+        durationMs:
+          type: ["integer", "null"]
+
+    MediaItem:
+      type: object
+      required: [id, incidentId, kind, sizeBytes, createdAt]
+      properties:
+        id: { type: integer }
+        incidentId: { type: integer }
+        kind: { type: string }
+        url:
+          type: ["string", "null"]
+        sizeBytes: { type: integer }
+        durationMs:
+          type: ["integer", "null"]
+        mimeType:
+          type: ["string", "null"]
+        createdAt: { type: string, format: date-time }
+
+    AlertItem:
+      type: object
+      required: [id, incidentId, channel, target, status, createdAt]
+      properties:
+        id: { type: integer }
+        incidentId: { type: integer }
+        channel: { type: string }
+        target: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    IncidentDetail:
+      type: object
+      required: [incident, alerts, locations, media]
+      properties:
+        incident:
+          $ref: "#/components/schemas/Incident"
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertItem"
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/LocationPoint"
+        media:
+          type: array
+          items:
+            $ref: "#/components/schemas/MediaItem"
+
+    IncidentStats:
+      type: object
+      required:
+        [
+          totalIncidents,
+          resolvedIncidents,
+          cancelledIncidents,
+          activeIncidents,
+          totalAlerts,
+          totalContacts,
+          last7Days,
+        ]
+      properties:
+        totalIncidents: { type: integer }
+        resolvedIncidents: { type: integer }
+        cancelledIncidents: { type: integer }
+        activeIncidents: { type: integer }
+        totalAlerts: { type: integer }
+        totalContacts: { type: integer }
+        last7Days:
+          type: array
+          items:
+            type: object
+            required: [day, count]
+            properties:
+              day: { type: string }
+              count: { type: integer }

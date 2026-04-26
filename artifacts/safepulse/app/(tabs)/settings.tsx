@@ -91,7 +91,7 @@ export default function SettingsScreen() {
             title="Voice trigger"
             subtitle={
               voiceSupported
-                ? "Listens for ‘Hey SafePulse, help me’"
+                ? "Listens for ‘Hey SafeSphere, help me’"
                 : "Available on supported browsers"
             }
             disabled={!voiceSupported}
@@ -128,7 +128,7 @@ export default function SettingsScreen() {
           <BulletRow
             icon="users"
             title="Smart escalation"
-            subtitle="If no response in 8 seconds, SafePulse alerts nearby users and re-pings your circle."
+            subtitle="Risk-aware: 4–14 seconds based on motion, repeats and severity. Then nearby helpers and your circle are re-pinged."
           />
         </SectionCard>
 

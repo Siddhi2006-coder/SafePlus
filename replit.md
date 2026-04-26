@@ -26,27 +26,48 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
 
-## Project: SafePulse
+## Project: SafeSphere (artifact dir: `safepulse`)
 
-Personal-safety mobile app with one-tap SOS, real-time location, multi-channel
-alerts, evidence capture and auto-escalation. Stack:
+Production-ready personal-safety app. Display name **SafeSphere**, scheme
+`safesphere`. Artifact dir + slug + AsyncStorage keys remain `safepulse.*` to
+preserve existing sessions / artifact paths.
 
-- **`artifacts/safepulse`** — Expo (React Native) mobile app w/ web preview at `/`.
-  Lavender→blue calming UI. Screens: auth (`(auth)/login|signup|verify`), tabs
-  (`(tabs)/index` SOS, `contacts`, `history`, `settings`), `active.tsx` for live
-  incident, `incident/[id].tsx` for detail. State via `providers/AuthProvider`
-  (AsyncStorage-backed token + user) and `providers/SosProvider` (active
-  incident polling, 8s escalation countdown, recurring location push, voice
-  trigger via web SpeechRecognition).
-- **`artifacts/api-server`** — Express 5 API. Local OTP auth (scrypt + bearer
-  tokens). Routes under `src/routes/`: `auth`, `contacts`, `sos` (trigger
-  fans out alerts × {sms,call,whatsapp,push}; escalate-nearby uses 5km
-  haversine on users with `lastLocationAt` ≤ 24h), `location`, `media`
-  (base64 inline), `incidents` (history/detail/stats).
-- **DB schema** in `lib/db/src/schema/`: users, sessions, otpChallenges,
-  contacts, incidents, locations, media, alerts.
-- **OpenAPI spec** at `lib/api-spec/openapi.yaml`. Run
+### Mobile (`artifacts/safepulse`)
+Expo SDK 54 / RN 0.81 with web preview at `/`. Calming lavender brand
+(`#7c6cff`); SOS uses pink→orange gradient (`#ff4d6d → #ff7a3d`).
+
+- Screens: `onboarding.tsx` (3-slide intro, gated by `safepulse.onboarded`),
+  `(auth)/login|signup|verify`, tabs (`index` SOS, `contacts`, `helpers`,
+  `history`, `settings`), `active.tsx`, `incident/[id].tsx`.
+- `providers/SosProvider` — motion sampling (DeviceMotion / web events),
+  risk-level driven countdown (4s high / 8s medium / 14s low), repeated
+  trigger detection (`safepulse.triggerHistory`), offline location queue
+  (`safepulse.locQueue`), evidence chunk simulation, route accumulation.
+- Components: `PulseSosButton` (riskLevel pulse + countdown ring),
+  `RiskBadge`, `DeliveryChip` (per-channel + retry/priority), `HelperCard`
+  (alias / distance / ETA), `MiniMap` (route polyline via segment Views +
+  accuracy ring — pure RN, no SVG / map libs).
+- API hooks: queries always pass explicit `queryKey: getGet*QueryKey(...)`.
+
+### Backend (`artifacts/api-server`)
+Express 5. Routes: `auth`, `contacts`, `sos` (trigger fans out alerts ×
+{sms,call,whatsapp,push} with priority + retry attempts; risk scoring in
+`lib/risk.ts`; motion telemetry endpoint; `escalate-nearby` uses 5km
+haversine + invites 3 closest available helpers), `location` & `media`
+(AES-256-GCM at rest via `lib/crypto.ts`), `incidents` (history / detail /
+stats / share-summary / responders), `responders` (availability toggle,
+invitations list, accept/decline with ETA, anonymous alias).
+
+### Schema additions (`lib/db/src/schema/`)
+users: `helperAlias`, `responderStatus`, `lastLat/Lng`, `lastLocationAt`.
+incidents: `riskScore`, `riskLevel`, `motionMaxSpeed`, `triggerCount24h`.
+alerts: `priority`, `attempts`, `lastError`. New `responders` table:
+incidentId, helperUserId, alias, status (invited/accepted/declined),
+distanceKm, etaMinutes, respondedAt.
+
+### Dev notes
+- OpenAPI at `lib/api-spec/openapi.yaml`; run
   `pnpm --filter @workspace/api-spec run codegen` after edits.
-
-OTP returns `devOtp` in response (no SMS gateway). The mobile client
-auto-fills it on the verify screen and shows a small dev-mode badge.
+- Test creds: `demo@safepulse.app` / OTP shown via `devOtp` in response.
+- Web preview insets: top 67, bottom tab bar 84.
+- Onboarding flag key: `safepulse.onboarded` (clear in storage to re-show).

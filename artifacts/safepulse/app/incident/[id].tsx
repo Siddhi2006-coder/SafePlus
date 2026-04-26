@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -13,11 +14,18 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getGetIncidentDetailQueryKey,
+  getGetIncidentRespondersQueryKey,
+  getGetIncidentShareSummaryQueryKey,
   useGetIncidentDetail,
+  useGetIncidentResponders,
+  useGetIncidentShareSummary,
 } from "@workspace/api-client-react";
 
+import { DeliveryChip } from "@/components/DeliveryChip";
 import { GradientBg } from "@/components/GradientBg";
+import { HelperCard } from "@/components/HelperCard";
 import { MiniMap } from "@/components/MiniMap";
+import { RiskBadge } from "@/components/RiskBadge";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusChip } from "@/components/StatusChip";
 import { useColors } from "@/hooks/useColors";
@@ -38,6 +46,35 @@ export default function IncidentDetailScreen() {
       queryKey: getGetIncidentDetailQueryKey(id),
     },
   });
+  const respondersQ = useGetIncidentResponders(id, {
+    query: {
+      enabled: !!id,
+      queryKey: getGetIncidentRespondersQueryKey(id),
+    },
+  });
+  const shareQ = useGetIncidentShareSummary(id, {
+    query: {
+      enabled: !!id,
+      queryKey: getGetIncidentShareSummaryQueryKey(id),
+    },
+  });
+
+  const onShare = async () => {
+    const summary = shareQ.data;
+    const mapsUrl = summary?.mapsUrl ?? "";
+    const summaryText =
+      summary?.summary ?? `SafeSphere incident #${id}`;
+    const message = `${summaryText}${mapsUrl ? `\n${mapsUrl}` : ""}`;
+    try {
+      await Share.share({
+        message,
+        url: mapsUrl,
+        title: "SafeSphere incident",
+      });
+    } catch {
+      /* ignore */
+    }
+  };
 
   if (detail.isLoading || !detail.data) {
     return (
@@ -51,6 +88,8 @@ export default function IncidentDetailScreen() {
 
   const { incident, alerts, locations, media } = detail.data;
   const lastPoint = locations[locations.length - 1];
+  const route = locations.map((p) => ({ lat: p.lat, lng: p.lng }));
+  const responders = respondersQ.data ?? [];
 
   let statusTone: "success" | "danger" | "neutral" = "neutral";
   if (incident.status === "resolved") statusTone = "success";
@@ -79,6 +118,22 @@ export default function IncidentDetailScreen() {
           <Text style={[styles.title, { color: c.foreground }]}>
             Incident #{incident.id}
           </Text>
+          <Pressable
+            onPress={onShare}
+            style={({ pressed }) => [
+              styles.shareBtn,
+              {
+                backgroundColor: c.secondary,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            hitSlop={8}
+          >
+            <Feather name="share-2" size={14} color={c.primary} />
+            <Text style={{ color: c.primary, fontFamily: "Inter_700Bold", fontSize: 12 }}>
+              Share
+            </Text>
+          </Pressable>
         </View>
 
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -95,12 +150,25 @@ export default function IncidentDetailScreen() {
             active
           />
           <StatusChip icon="zap" label={incident.trigger} tone="info" active />
+          {incident.riskLevel ? (
+            <RiskBadge
+              level={incident.riskLevel}
+              score={incident.riskScore}
+              compact
+            />
+          ) : null}
           {incident.escalated ? (
             <StatusChip icon="users" label="Escalated" tone="warning" active />
           ) : null}
           {incident.discreet ? (
             <StatusChip icon="eye-off" label="Discreet" tone="info" active />
           ) : null}
+          <StatusChip
+            icon="lock"
+            label="Encrypted"
+            tone="success"
+            active
+          />
         </View>
 
         <SectionCard>
@@ -112,6 +180,7 @@ export default function IncidentDetailScreen() {
               lat={lastPoint?.lat ?? incident.startLat}
               lng={lastPoint?.lng ?? incident.startLng}
               pointsCount={locations.length}
+              route={route}
             />
           </View>
           <View style={{ marginTop: 14, gap: 6 }}>
@@ -181,10 +250,46 @@ export default function IncidentDetailScreen() {
                         marginTop: 2,
                       }}
                     >
-                      {formatTime(a.createdAt)} · {a.status}
+                      {formatTime(a.createdAt)}
+                      {a.priority ? ` · ${a.priority}` : ""}
                     </Text>
                   </View>
+                  <DeliveryChip
+                    channel={a.channel}
+                    status={a.status}
+                    attempts={a.attempts}
+                    priority={a.priority}
+                    compact
+                  />
                 </View>
+              ))}
+            </View>
+          )}
+        </SectionCard>
+
+        <SectionCard>
+          <View style={styles.sectionRow}>
+            <Text style={[styles.section, { color: c.foreground }]}>
+              Helpers
+            </Text>
+            <Text style={{ color: c.mutedForeground, fontSize: 12 }}>
+              {responders.length} invited
+            </Text>
+          </View>
+          {responders.length === 0 ? (
+            <Text style={[styles.empty, { color: c.mutedForeground }]}>
+              No nearby helpers were invited for this incident.
+            </Text>
+          ) : (
+            <View style={{ marginTop: 8, gap: 8 }}>
+              {responders.map((r) => (
+                <HelperCard
+                  key={r.id}
+                  alias={r.alias}
+                  status={r.status}
+                  distanceKm={r.distanceKm}
+                  etaMinutes={r.etaMinutes}
+                />
               ))}
             </View>
           )}
@@ -424,5 +529,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+  },
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginLeft: "auto",
   },
 });

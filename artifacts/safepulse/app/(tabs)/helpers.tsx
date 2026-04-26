@@ -49,18 +49,13 @@ export default function HelpersScreen() {
   const declineMut = useDeclineInvitation();
 
   const availability: AvailabilityState | undefined = availabilityQ.data;
-  const isAvailable = availability?.available ?? false;
-  const radiusKm = availability?.radiusKm ?? 5;
+  const isAvailable = availability?.status === "available";
+  const alias = availability?.alias ?? "Helper";
 
   const toggleAvailable = async () => {
     await setAvail.mutateAsync({
-      data: { available: !isAvailable, radiusKm: radiusKm ?? 5 },
+      data: { status: isAvailable ? "unavailable" : "available" },
     });
-    qc.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
-  };
-
-  const setRadius = async (km: number) => {
-    await setAvail.mutateAsync({ data: { available: isAvailable, radiusKm: km } });
     qc.invalidateQueries({ queryKey: getGetMyAvailabilityQueryKey() });
   };
 
@@ -99,7 +94,7 @@ export default function HelpersScreen() {
           </Text>
           <Text style={[styles.subtitle, { color: c.mutedForeground }]}>
             Opt in to receive anonymous SOS invitations from people nearby.
-            Your real name is never shared.
+            Your real name is never shared — you'll appear as “{alias}”.
           </Text>
         </View>
 
@@ -109,10 +104,12 @@ export default function HelpersScreen() {
               <Text style={[styles.cardTitle, { color: c.foreground }]}>
                 {isAvailable ? "Available to help" : "Off duty"}
               </Text>
-              <Text style={{ color: c.mutedForeground, fontSize: 12, marginTop: 2 }}>
+              <Text
+                style={{ color: c.mutedForeground, fontSize: 12, marginTop: 2 }}
+              >
                 {isAvailable
-                  ? `You'll be invited within ${radiusKm} km of an SOS.`
-                  : "Turn on to receive invitations near you."}
+                  ? "We'll invite you when an SOS is raised within roughly 5 km."
+                  : "Turn on to start receiving anonymous invitations."}
               </Text>
             </View>
             <Pressable
@@ -136,31 +133,27 @@ export default function HelpersScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.radiusRow}>
-            {[3, 5, 10].map((km) => (
-              <Pressable
-                key={km}
-                onPress={() => setRadius(km)}
-                style={({ pressed }) => [
-                  styles.radiusPill,
-                  {
-                    backgroundColor:
-                      radiusKm === km ? c.primary : c.muted,
-                    opacity: pressed ? 0.9 : 1,
-                  },
-                ]}
+          <View style={styles.aliasRow}>
+            <View
+              style={[
+                styles.aliasBadge,
+                { backgroundColor: c.secondary, borderColor: c.border },
+              ]}
+            >
+              <Feather name="user" size={12} color={c.primary} />
+              <Text
+                style={{
+                  color: c.secondaryForeground,
+                  fontFamily: "Inter_700Bold",
+                  fontSize: 12,
+                }}
               >
-                <Text
-                  style={{
-                    color: radiusKm === km ? "#fff" : c.foreground,
-                    fontFamily: "Inter_700Bold",
-                    fontSize: 12,
-                  }}
-                >
-                  {km} km
-                </Text>
-              </Pressable>
-            ))}
+                {alias}
+              </Text>
+            </View>
+            <Text style={{ color: c.mutedForeground, fontSize: 11 }}>
+              Anonymous alias shown to people who need help
+            </Text>
           </View>
         </SectionCard>
 
@@ -217,13 +210,10 @@ export default function HelpersScreen() {
                 { backgroundColor: c.muted, borderColor: c.border },
               ]}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View
-                  style={[
-                    styles.avatar,
-                    { backgroundColor: c.primary },
-                  ]}
-                >
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <View style={[styles.avatar, { backgroundColor: c.primary }]}>
                   <Feather name="alert-triangle" size={16} color="#fff" />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -234,7 +224,7 @@ export default function HelpersScreen() {
                       fontSize: 14,
                     }}
                   >
-                    {inv.requesterAlias} needs help
+                    {inv.victimAlias} needs help
                   </Text>
                   <Text
                     style={{
@@ -246,7 +236,7 @@ export default function HelpersScreen() {
                     {inv.distanceKm != null
                       ? `${inv.distanceKm.toFixed(1)} km away`
                       : "Nearby"}{" "}
-                    · {formatRelative(inv.invitedAt)}
+                    · {formatRelative(inv.createdAt)} · {inv.riskLevel} risk
                   </Text>
                 </View>
               </View>
@@ -335,10 +325,10 @@ export default function HelpersScreen() {
                       flex: 1,
                     }}
                   >
-                    {inv.requesterAlias}
+                    {inv.victimAlias}
                   </Text>
                   <Text style={{ color: c.mutedForeground, fontSize: 11 }}>
-                    {inv.status} · {formatRelative(inv.invitedAt)}
+                    {inv.status} · {formatRelative(inv.createdAt)}
                   </Text>
                 </View>
               ))}
@@ -382,15 +372,20 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
   },
-  radiusRow: {
+  aliasRow: {
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
+    gap: 10,
     marginTop: 14,
   },
-  radiusPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  aliasBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
+    borderWidth: 1,
   },
   headerRow: {
     flexDirection: "row",

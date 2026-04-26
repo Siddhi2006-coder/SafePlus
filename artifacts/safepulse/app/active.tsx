@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getGetIncidentLocationsQueryKey,
   getGetIncidentRespondersQueryKey,
+  getGetIncidentShareSummaryQueryKey,
   useGetIncidentLocations,
   useGetIncidentResponders,
   useGetIncidentShareSummary,
@@ -74,7 +75,10 @@ export default function ActiveScreen() {
     },
   });
   const shareQ = useGetIncidentShareSummary(incidentId, {
-    query: { enabled: !!incidentId },
+    query: {
+      enabled: !!incidentId,
+      queryKey: getGetIncidentShareSummaryQueryKey(incidentId),
+    },
   });
   const uploadMedia = useUploadMedia();
 
@@ -148,12 +152,12 @@ export default function ActiveScreen() {
   const onShare = async () => {
     try {
       const summary = shareQ.data;
-      const url = summary?.shareUrl ?? "";
-      const message =
-        `I've triggered a SafeSphere SOS. Live location: ` +
-        `https://maps.google.com/?q=${lat.toFixed(5)},${lng.toFixed(5)}` +
-        (url ? `\n\nIncident: ${url}` : "");
-      await Share.share({ message, url, title: "SafeSphere SOS" });
+      const mapsUrl =
+        summary?.mapsUrl ??
+        `https://maps.google.com/?q=${lat.toFixed(5)},${lng.toFixed(5)}`;
+      const summaryText = summary?.summary ?? "I've triggered a SafeSphere SOS.";
+      const message = `${summaryText}\nLive location: ${mapsUrl}`;
+      await Share.share({ message, url: mapsUrl, title: "SafeSphere SOS" });
     } catch {
       /* ignore */
     }

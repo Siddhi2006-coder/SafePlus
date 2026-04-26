@@ -17,6 +17,7 @@ import {
 } from "@workspace/api-client-react";
 
 import { GradientBg } from "@/components/GradientBg";
+import { RiskBadge } from "@/components/RiskBadge";
 import { SectionCard } from "@/components/SectionCard";
 import { useColors } from "@/hooks/useColors";
 import { formatDateTime, formatRelative } from "@/lib/format";
@@ -155,13 +156,20 @@ function IncidentRow({ incident }: { incident: Incident }) {
           >
             {formatDateTime(incident.createdAt)} · {formatRelative(incident.createdAt)}
           </Text>
-          <View style={{ flexDirection: "row", gap: 12, marginTop: 6 }}>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
             <Stat label="Alerts" value={incident.alertsSent} />
             {incident.escalated ? (
               <Stat label="Escalated" value="Yes" tint={c.warning} />
             ) : null}
             {incident.discreet ? (
               <Stat label="Discreet" value="On" tint={c.primary} />
+            ) : null}
+            {incident.riskLevel ? (
+              <RiskBadge
+                level={incident.riskLevel}
+                score={incident.riskScore}
+                compact
+              />
             ) : null}
           </View>
         </View>

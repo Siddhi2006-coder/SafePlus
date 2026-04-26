@@ -76,7 +76,7 @@ export default function LoginScreen() {
           >
             <Feather name="shield" size={22} color="#fff" />
           </LinearGradient>
-          <Text style={[styles.brand, { color: c.foreground }]}>SafePulse</Text>
+          <Text style={[styles.brand, { color: c.foreground }]}>SafeSphere</Text>
         </View>
 
         <Text style={[styles.title, { color: c.foreground }]}>
@@ -126,7 +126,7 @@ export default function LoginScreen() {
 
           <View style={styles.footer}>
             <Text style={{ color: c.mutedForeground, fontFamily: "Inter_500Medium" }}>
-              New to SafePulse?{" "}
+              New to SafeSphere?{" "}
             </Text>
             <Link href="/(auth)/signup" asChild>
               <Pressable>

@@ -83,7 +83,7 @@ export default function SignupScreen() {
           >
             <Feather name="shield" size={22} color="#fff" />
           </LinearGradient>
-          <Text style={[styles.brand, { color: c.foreground }]}>SafePulse</Text>
+          <Text style={[styles.brand, { color: c.foreground }]}>SafeSphere</Text>
         </View>
 
         <Text style={[styles.title, { color: c.foreground }]}>
